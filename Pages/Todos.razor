@@ -1,0 +1,308 @@
+﻿@page "/todos"
+
+<nav class="navbar navbar-light bg-light justify-content-between">
+    <h1 class="navbar-brand mb-0 h1">Todos</h1>
+    <button class="btn btn-primary" type="button" @onclick="OpenAddTodoDialog">
+        <span class="oi oi-plus" /> Add
+    </button>
+</nav>
+<ul class="nav nav-tabs">
+    <li class="nav-item ">
+        <a class='nav-link btn @(_tabFilter == "All" ? "active" : "")' @onclick='()=>TabFilter("All")'>All</a>
+    </li>
+    <li class="nav-item">
+        <a class='nav-link btn @(_tabFilter == "Due" ? "active" : "")' @onclick='()=>TabFilter("Due")'>Due</a>
+    </li>
+    <li class="nav-item">
+        <a class='nav-link btn @(_tabFilter == "Done" ? "active" : "")' @onclick='()=>TabFilter("Done")'>Done</a>
+    </li>
+</ul>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                <div class="d-flex">
+                    Status
+                    <a class='btn text-@(_sortBy == "status" ? "primary" : "secondary")' data-mdb-toggle="tooltip"
+                        @onclick='()=>SortByHandler("status")'>
+                        <span class='oi oi-sort-@(_sortBy == "status" ? _sortDirection : "ascending")' />
+                    </a>
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    <input type="search" class="form-control search" placeholder="Search" @oninput="SearchTaskName" />
+                    <a class='btn text-@(_sortBy == "taskName" ? "primary" : "secondary")' data-mdb-toggle="tooltip"
+                        @onclick='()=>SortByHandler("taskName")'>
+                        <span class='oi oi-sort-@(_sortBy == "taskName" ? _sortDirection : "ascending")' />
+                    </a>
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Due Date
+                    <a class='btn text-@(_sortBy == "dueDate" ? "primary" : "secondary")' data-mdb-toggle="tooltip"
+                        @onclick='()=>SortByHandler("dueDate")'>
+                        <span class='oi oi-sort-@(_sortBy == "dueDate" ? _sortDirection : "ascending")' />
+                    </a>
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Created At
+                    <a class='btn text-@(_sortBy == "createdAt" ? "primary" : "secondary")' data-mdb-toggle="tooltip"
+                        @onclick='()=>SortByHandler("createdAt")'>
+                        <span class='oi oi-sort-@(_sortBy == "createdAt" ? _sortDirection : "ascending")' />
+                    </a>
+                </div>
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @{
+            IEnumerable<TodoItem> todoList = _todos;
+            if (_sortBy == "status")
+            {
+                todoList = _sortDirection == "ascending" ? todoList.OrderBy(t => t.IsDone) : todoList.OrderByDescending(t =>
+                t.IsDone);
+            }
+            else if (_sortBy == "taskName")
+            {
+                todoList = _sortDirection == "ascending" ? todoList.OrderBy(t => t.TaskName) : todoList.OrderByDescending(t =>
+                t.TaskName);
+            }
+            else if (_sortBy == "dueDate")
+            {
+                todoList = _sortDirection == "ascending" ? todoList.OrderBy(t => t.DueDate) : todoList.OrderByDescending(t =>
+                t.DueDate);
+            }
+            else if (_sortBy == "createdAt")
+            {
+                todoList = _sortDirection == "ascending" ? todoList.OrderBy(t => t.CreatedAt) : todoList.OrderByDescending(t =>
+                t.CreatedAt);
+            }
+
+            if (_tabFilter == "Due")
+            {
+                todoList = todoList.Where(t => !t.IsDone);
+            }
+            else if (_tabFilter == "Done")
+            {
+                todoList = todoList.Where(t => t.IsDone);
+            }
+
+            foreach (var todoItem in todoList)
+            {
+                <tr>
+                    <td>
+                        <div class="form-check">
+                            <input class="form-check-input me-0" type="checkbox" checked="@todoItem.IsDone"
+                            @onchange='()=>ToggleDone(todoItem)' />
+                        </div>
+                    </td>
+                    <td class='@(todoItem.IsDone ? "text-decoration-line-through" : "")'>@todoItem.TaskName</td>
+                    <td>
+                        @{
+                            bool isToday = !todoItem.IsDone && todoItem.DueDate == DateTime.Today;
+                            bool isOlder = !todoItem.IsDone && todoItem.DueDate < DateTime.Today;
+                            <p class='small mb-0 @(isToday ? "text-warning" : isOlder ? "text-danger" : "")'>
+                                @if (isToday || isOlder)
+                                {
+                                    <span class="oi oi-warning mr-3" />
+                                }
+                                @todoItem.DueDate.ToString("MMM dd, yyyy")
+                            </p>
+                        }
+                </td>
+                <td>
+                    <p class="small mb-0">
+                        @todoItem.CreatedAt.ToString("MMM dd, yyyy h:mm tt")
+                    </p>
+                </td>
+                <td>
+                    <button disabled="@todoItem.IsDone" class="btn btn-outline-secondary" type="button"
+                        @onclick="()=>OpenEditTodoDialog(todoItem)">
+                        <span class="oi oi-pencil" /> Edit
+                    </button>
+                    <button class="btn btn-outline-danger" type="button" @onclick="()=>OpenDeleteTodoDialog(todoItem)">
+                        <span class="oi oi-delete" /> Delete
+                    </button>
+                </td>
+            </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@if (_showEditTodoDialog)
+{
+    <ModalDialog Title="@_dialogTitle" OnClose="@OnEditTodoDialogClose" OkLabel="@_dialogOkLabel">
+    <div class="form-floating">
+        <input id="taskName" type="text" class="form-control" @bind="_todoModel.TaskName" placeholder="Task Name" />
+        <label for="taskName">Task Name</label>
+    </div>
+    <div class="form-floating">
+        <label for="dueDate">Due Date</label>
+        <input id="dueDate" type="date" min='@DateTime.Today.ToString("yyyy-MM-dd")'
+            value='@_todoModel.DueDate.ToString("yyyy-MM-dd")' @onchange="updateDate" class="form-control text-left"
+            placeholder="Due Date">
+    </div>
+
+    @if (!string.IsNullOrEmpty(_editTodoErrorMessage))
+        {
+            <AlertMessage Type="danger" Message="@_editTodoErrorMessage" />
+        }
+        </ModalDialog>
+}
+
+@if (_showDeleteTodoDialog)
+{
+    <ModalDialog Title="Delete Todo" OnClose="@OnDeleteTodoDialogClose" OkLabel="Confirm">
+    <p>Are you sure you want to delete <strong>@_deleteTodo.TaskName</strong> task?</p>
+    @if (!string.IsNullOrEmpty(_deleteTodoErrorMessage))
+        {
+            <AlertMessage Type="danger" Message="@_deleteTodoErrorMessage" />
+        }
+        </ModalDialog>
+}
+
+@code {
+    [CascadingParameter]
+    private GlobalState _globalState { get; set; }
+    private bool _showEditTodoDialog { get; set; }
+    private bool _showDeleteTodoDialog { get; set; }
+    private List<TodoItem> _todos { get; set; }
+    private TodoItem _deleteTodo { get; set; }
+    private string _dialogTitle { get; set; }
+    private string _dialogOkLabel { get; set; }
+    private string _editTodoErrorMessage { get; set; }
+    private string _deleteTodoErrorMessage { get; set; }
+    private TodoItem _todoModel { get; set; }
+    private string _tabFilter = "All";
+    private string _sortBy = "dueDate";
+    private string _sortDirection = "ascending";
+
+    protected override void OnInitialized()
+    {
+        _todos = TodosService.GetAll(_globalState.CurrentUser.Id);
+    }
+
+    private void SortByHandler(string sortByName)
+    {
+        if (_sortBy == sortByName)
+        {
+            _sortDirection = _sortDirection == "ascending" ? "descending" : "ascending";
+        }
+        else
+        {
+            _sortBy = sortByName;
+            _sortDirection = "ascending";
+        }
+    }
+
+    private void OpenAddTodoDialog()
+    {
+        _dialogTitle = "Add Todo";
+        _dialogOkLabel = "Add";
+        _todoModel = new TodoItem();
+        _todoModel.Id = Guid.Empty;
+        _showEditTodoDialog = true;
+    }
+
+    private void SearchTaskName(ChangeEventArgs e)
+    {
+        var searchTerm = e.Value.ToString();
+        if (!string.IsNullOrEmpty(searchTerm) && searchTerm.Length > 2)
+        {
+            _todos = TodosService.GetAll(_globalState.CurrentUser.Id).Where(t =>
+            t.TaskName.ToLower().Contains(searchTerm.ToLower())).ToList();
+        }
+        else
+        {
+            _todos = TodosService.GetAll(_globalState.CurrentUser.Id);
+        }
+    }
+
+    private void OpenEditTodoDialog(TodoItem editTodo)
+    {
+        _dialogTitle = "Edit Todo";
+        _dialogOkLabel = "Save";
+
+        _todoModel = editTodo;
+
+        _showEditTodoDialog = true;
+    }
+
+    private void OpenDeleteTodoDialog(TodoItem todoItem)
+    {
+        _deleteTodo = todoItem;
+        _showDeleteTodoDialog = true;
+    }
+
+    private void updateDate(ChangeEventArgs e)
+    {
+        _todoModel.DueDate = DateTime.Parse(e.Value.ToString());
+    }
+    private void OnEditTodoDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+            _showEditTodoDialog = false;
+        }
+        else
+        {
+            try
+            {
+                _editTodoErrorMessage = "";
+                if (_todoModel.Id == Guid.Empty)
+                {
+                    _todos = TodosService.Create(_globalState.CurrentUser.Id, _todoModel.TaskName, _todoModel.DueDate);
+                }
+                else
+                {
+                    _todos = TodosService.Update(_globalState.CurrentUser.Id, _todoModel.Id, _todoModel.TaskName, _todoModel.DueDate,
+                    _todoModel.IsDone);
+                }
+                _showEditTodoDialog = false;
+            }
+            catch (Exception e)
+            {
+                _editTodoErrorMessage = e.Message;
+            }
+        }
+    }
+    private void OnDeleteTodoDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+
+            _showDeleteTodoDialog = false;
+            _deleteTodo = null;
+        }
+        else
+        {
+            try
+            {
+                _deleteTodoErrorMessage = "";
+                _todos = TodosService.Delete(_globalState.CurrentUser.Id, _deleteTodo.Id);
+                _showDeleteTodoDialog = false;
+                _deleteTodo = null;
+            }
+            catch (Exception e)
+            {
+                _deleteTodoErrorMessage = e.Message;
+            }
+        }
+    }
+    private void TabFilter(string status)
+    {
+        _tabFilter = status;
+    }
+    private void ToggleDone(TodoItem todo)
+    {
+        todo.IsDone = !todo.IsDone;
+        _todos = TodosService.Update(_globalState.CurrentUser.Id, todo.Id, todo.TaskName, todo.DueDate, todo.IsDone);
+    }
+}

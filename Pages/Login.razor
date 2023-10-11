@@ -1,0 +1,74 @@
+﻿@page "/login"
+@inject NavigationManager NavManager
+
+<div class="login-body">
+    <div class="form-login">
+        <form class="text-center" @onsubmit="LoginHandler">
+            <img class="mb-4" src="/appicon.png" alt="" height="72">
+            <h1 class="h3 mb-3 fw-normal">Please Login</h1>
+            @if (_showDefaultCredentials)
+            {
+                <div class="alert alert-info" role="alert">
+                    Username: <strong>@UsersService.SeedUsername</strong><br />
+                    Password: <strong>@UsersService.SeedPassword</strong>
+                </div>
+            }
+
+            <div class="form-floating">
+                <input type="text" class="form-control username" @bind="_username" placeholder="Username" />
+                <label for="floatingInput">Username</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="password" class="form-control password" @bind="_password" placeholder="Password" />
+                <label for="floatingPassword">Password</label>
+            </div>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <AlertMessage Type="danger" Message="@_errorMessage" />
+            }
+            <button class="w-100 btn btn-lg btn-primary" type="submit">
+                <span class="oi oi-account-login"></span> Login
+            </button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private GlobalState _globalState { get; set; }
+    private bool _showDefaultCredentials { get; set; }
+    private string _username { get; set; }
+    private string _password { get; set; }
+    private string _errorMessage = "";
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var user = UsersService.Login(UsersService.SeedUsername, UsersService.SeedPassword);
+            _showDefaultCredentials = user.HasInitialPassword;
+        }
+        catch { }
+
+        _globalState.CurrentUser = null;
+        _errorMessage = "";
+    }
+
+    private void LoginHandler()
+    {
+        try
+        {
+            _errorMessage = "";
+            _globalState.CurrentUser = UsersService.Login(_username, _password);
+            if (_globalState.CurrentUser != null)
+            {
+                NavManager.NavigateTo(_globalState.CurrentUser.HasInitialPassword ? "/change-password" : "/");
+            }
+        }
+        catch (Exception e)
+        {
+            _errorMessage = e.Message;
+            Console.WriteLine(e);
+        }
+    }
+}
